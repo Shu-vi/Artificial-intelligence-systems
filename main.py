@@ -1,5 +1,6 @@
 from deeppavlov import build_model
 from deeppavlov.core.common.file import read_json
+from flask import jsonify
 from enum import Enum
 import requests
 import telebot
@@ -16,30 +17,25 @@ user_states = {}
 token = open("token.txt").readline().strip()
 bot = telebot.TeleBot(token)
 
-model_config_roberta = read_json("few_shot_roberta.json")
-model_roberta = build_model(model_config_roberta, download=True)
-
-dataset = []
-with open('train.json', 'r') as file:
-    dataset = json.load(file)
 
 
 def cat_facts():
-    url = "http://127.0.0.1:5001/"
-    response = requests.post(url)
+    url = 'https://catfact.ninja/fact'
+    response = requests.get(url)
     if response.status_code == 200:
-        return response.json()['data']
+        return response.json()['fact']
     else:
-        return "Ошибка при попытке получить факт о коте"
+        return "Неудалось получить факт о коте. Попробуйте позже"
 
 
 def cat_img():
-    url = "http://127.0.0.1:5000/"
-    response = requests.post(url)
+    domain_name = "https://cataas.com/"
+    url = domain_name + "cat/says/%D0%9F%D0%BE%D1%81%D1%82%D0%B0%D0%B2%D1%8C%D1%82%D0%B5%20%D0%B0%D0%B2%D1%82%D0%BE%D0%BC%D0%B0%D1%82%20%D0%BF%D0%BE%D0%B6%D0%B0%D0%BB%D1%83%D0%B9%D1%81%D1%82%D0%B0?json=true"
+    response = requests.get(url)
     if response.status_code == 200:
-        return response.json()['data']
+        return domain_name + response.json()['url']
     else:
-        return "Ошибка при попытке получить изображение кота"
+        return "Неудалось получить изображение кота. Попробуй позже"
 
 
 def naruto(question):
@@ -47,10 +43,18 @@ def naruto(question):
     data = {"data": question}
     response = requests.post(url, json=data)
     if response.status_code == 200:
-        print(response.json()['data'])
         return response.json()['data']
     else:
         return "Ошибка при попытке узнать о вселенной Наруто"
+
+def intent_get(text):
+    url = "http://127.0.0.1:5000/"
+    data = {"data": text}
+    response = requests.post(url, json=data)
+    if response.status_code == 200:
+        return response.json()['data']
+    else:
+        return "Ошибка при попытке узнать намерение"
 
 
 @bot.message_handler(commands=["start"])
@@ -64,7 +68,7 @@ def send_welcome(message):
 def echo_all(message):
     user_id = message.chat.id
     mode = user_states.get(user_id, Modes.INITIAL)
-    intent = model_roberta([message.text], dataset)[0]
+    intent = intent_get(message.text)
     if intent == "cat_facts" and mode == Modes.INITIAL:
         print("Ищу факт о котах")
         bot.reply_to(message, cat_facts())
